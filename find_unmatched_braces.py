@@ -16,14 +16,21 @@ def check_file(f, open_close_pairs):
         {('{', '}'): ([(2, 9)], [(1, 1)])}
         >>> check_file(['} ] [ {'], {('{', '}'), ('[', ']')})
         {('[', ']'): ([(1, 5)], [(1, 3)]), ('{', '}'): ([(1, 7)], [(1, 1)])}
+
+        >>> # If open/close are the same, then all are listed as "open"
+        >>> check_file(['$latex math$', '$is harder'], {('$', '$')})
+        {('$', '$'): ([(2, 1)], [])}
+        >>> check_file(['$impossible to', 'know whether', '$unmatched open', '$or just multi-line'], {('$', '$')})
+        {('$', '$'): ([(4, 1)], [])}
+
     """
 
     opens = {}
     closes = {}
     open_for = {}
     for open_symbol, close_symbol in open_close_pairs:
-        open_for[close_symbol] = open_symbol
         opens[open_symbol] = []
+        open_for[close_symbol] = opens[open_symbol]
         closes[close_symbol] = []
 
     line_number = 0
@@ -32,11 +39,16 @@ def check_file(f, open_close_pairs):
         column = 0
         for sym in line:
             column += 1
-            if sym in opens:
+            if sym in opens and open_for.get(sym, None) == opens[sym]:
+                if len(opens[sym]) == 0:
+                    opens[sym].append((line_number, column))
+                else:
+                    opens[sym].pop()
+            elif sym in opens:
                 opens[sym].append((line_number, column))
             elif sym in closes:
-                if len(opens[open_for[sym]]) > 0:
-                    opens[open_for[sym]].pop()
+                if len(open_for[sym]) > 0:
+                    open_for[sym].pop()
                 else:
                     closes[sym].append((line_number, column))
 
@@ -71,9 +83,14 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description="Find unmatched curly braces")
     parser.add_argument('filenames', nargs='+', help='Files to check')
-    parser.add_argument('--symbols', nargs='*', help='Bracket symbol to check for', default=['{', '}'])
+    parser.add_argument('--verbose', '-v', action='store_const', dest='verbose', const=True, help='Chat more')
+    parser.add_argument('--symbols', nargs='*', action='store', dest='symbols', help='Bracket symbol to check for (overrides other flags)', default=['{', '}'])
+    parser.add_argument('--latex', action='store_const', dest='symbols', const=['{', '}', '$', '$'], help="Check for LaTeX brackets (overrides other flags): { } [ ]")
     args = parser.parse_args()
-    if len(args.symbols) % 2 == 0:
+    number_of_symbols = len(args.symbols)
+    if number_of_symbols > 0 and number_of_symbols % 2 == 0:
+        if args.verbose:
+            print("Checking for: {brackets}".format(brackets = functools.reduce(lambda x, y: '{x} {y}'.format(x=x, y=y), args.symbols)))
         open_close_pairs = list_to_pairs(args.symbols)
         for filename in args.filenames:
             try:
@@ -84,4 +101,8 @@ if __name__ == '__main__':
                 pass
     else:
         import sys
-        print("Must specify bracket symbols as a pair, e.g. {program_name} {{ }} ( )".format(program_name = sys.argv[0]))
+        sys.stderr.write("Must specify bracket symbols as a list of pairs, e.g. {program_name} {{ }} ( )\n".format(program_name = sys.argv[0]))
+        sys.stderr.write("I read:\n")
+        for sym in args.symbols:
+            sys.stderr.write('{sym} '.format(sym=sym))
+        sys.stderr.write('\n')
