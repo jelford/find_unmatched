@@ -1,8 +1,35 @@
 #! /usr/bin/env python
 
+""" Tool for checking for unmatched open/close braces in files.
+    But surely any half-decent IDE or compiler would do that for you?
+    Surely. But sometimes LaTeX has some trouble, especially when it
+    has to pass through an \input{...}.
+
+    >>> print_list('test', 
+    ...     condense_to_list(
+    ...         check_file(
+    ...             ['$ unmatched math', 
+    ...             '\overline{ unmatched close', 
+    ...             '(and also unmatched normal bracket',
+    ...              'for good measure'], 
+    ...             list_to_pairs(latex_symbol_list))))
+    test - [1:1] ($)
+    test - [2:10] ({)
+    test - [3:1] (()
+"""
+
 import functools, operator
 
+latex_symbol_list = ['{', '}', '$', '$', '(', ')']
+
 def print_list(filename, errors):
+    """ Just prints out the list of errors:
+        
+        >>> print_list('hello', [(')', 1, 3), ('(', 2, 4), ('{', 5, 10)])
+        hello - [1:3] ())
+        hello - [2:4] (()
+        hello - [5:10] ({)
+    """
     for message, line, column in errors:
         print('{filename} - [{line}:{column}] ({message})'.format(**locals()))
 
@@ -85,7 +112,7 @@ if __name__ == '__main__':
     parser.add_argument('filenames', nargs='+', help='Files to check')
     parser.add_argument('--verbose', '-v', action='store_const', dest='verbose', const=True, help='Chat more')
     parser.add_argument('--symbols', nargs='*', action='store', dest='symbols', help='Bracket symbol to check for (overrides other flags)', default=['{', '}'])
-    parser.add_argument('--latex', action='store_const', dest='symbols', const=['{', '}', '$', '$'], help="Check for LaTeX brackets (overrides other flags): { } [ ]")
+    parser.add_argument('--latex', action='store_const', dest='symbols', const=latex_symbol_list, help="Check for LaTeX brackets (overrides other flags): { } [ ]")
     args = parser.parse_args()
     number_of_symbols = len(args.symbols)
     if number_of_symbols > 0 and number_of_symbols % 2 == 0:
